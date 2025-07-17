@@ -1,40 +1,35 @@
 # Image Finder and Downloader
+
 This project provides two Python tools for working with images:
+1. **`find_similar.py`**: A tool to search a directory for images similar to a given query image, using ORB feature matching and homography to handle cases where the query image may be a crop of a larger image.
+2. **`download_images.py`**: A tool to scrape and download images from a list of websites, saving them with metadata for further analysis.
 
-find_similar.py: A tool to search a directory for images similar to a given query image, using ORB feature matching and homography to handle cases where the query image may be a crop of a larger image.
-download_images.py: A tool to scrape and download images from a list of websites, saving them with metadata for further analysis.
+## Table of Contents
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [find_similar.py](#find_similarpy)
+  - [download_images.py](#download_imagespy)
+- [How It Works](#how-it-works)
+  - [find_similar.py](#find_similarpy-1)
+  - [download_images.py](#download_imagespy-1)
+- [Contributing](#contributing)
+- [License](#license)
 
-Table of Contents
+## Requirements
 
-Requirements
-Installation
-Usage
-find_similar.py
-download_images.py
-
-
-How It Works
-find_similar.py
-download_images.py
-
-
-Contributing
-License
-
-Requirements
 The project requires the following Python packages:
-opencv-python==4.12.0
-numpy==1.26.4
-tqdm==4.66.5
-requests==2.32.3
-beautifulsoup4==4.12.3
 
-These are listed in the requirements.txt file for easy installation.
-Installation
+opencv-python==4.12.0numpy==1.26.4tqdm==4.66.5requests==2.32.3beautifulsoup4==4.12.3
 
-Clone the repository:
-git clone https://github.com/your-username/image-finder-downloader.git
-cd image-finder-downloader
+These are listed in the `requirements.txt` file for easy installation.
+
+## Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/your-username/image-finder-downloader.git
+   cd image-finder-downloader
 
 
 Set up a virtual environment (recommended):
@@ -135,4 +130,4 @@ Open a pull request.
 
 Please include tests and update the README if necessary.
 License
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the MIT License. See the LICENSE file for details.```
