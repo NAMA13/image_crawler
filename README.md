@@ -128,6 +128,8 @@ Commit changes (git commit -m 'Add feature').
 Push to the branch (git push origin feature-name).
 Open a pull request.
 
+Fikir babasi: Rafig Zarbaliyev
+
 Please include tests and update the README if necessary.
 License
 This project is licensed under the MIT License. See the LICENSE file for details.```
