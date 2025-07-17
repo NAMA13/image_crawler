@@ -1,91 +1,140 @@
+#!/usr/bin/env python3
+"""
+ImCrawler Similarity Checker - Image Similarity Finder
+Version: 1.3.0
+"""
 import cv2
 import numpy as np
 import os
 import argparse
 from tqdm import tqdm
+import signal
+import json
+from threading import Lock
+
+# Global shutdown flag
+shutdown_flag = False
+
+def handle_sigint(signum, frame):
+    global shutdown_flag
+    shutdown_flag = True
+    print("\nInterrupt received, stopping... you can resume later.")
+
+signal.signal(signal.SIGINT, handle_sigint)
+
+# ASCII Logo
+logo = r'''
+.___                                         .__                  
+|   |  _____    ____ _______ _____  __  _  __|  |    ____ _______ 
+|   | /     \ _/ ___\\_  __ \\__  \ \ \/ \/ /|  |  _/ __ \\_  __ \
+|   ||  Y Y  \\  \___ |  | \/ / __ \_\     / |  |__\  ___/ |  | \/
+|___||__|_|  / \___  >|__|   (____  / \/\_/  |____/ \___  >|__|   
+           \/      \/             \/                    \/        
+
+ImCrawler Similarity Checker v1.0.2 by natig.
+'''  
+print(logo)
+
+# Resume/inliers file
+DATA_FILE = 'inliers.json'
+lock = Lock()
+
+def load_data(directory):
+    path = os.path.join(directory, DATA_FILE)
+    if os.path.exists(path):
+        with open(path, 'r') as f:
+            data = json.load(f)
+        print(f"Loaded inliers for {len(data)} images, resuming...")
+        return data  # dict: filename -> inliers
+    return {}  # not processed
+
+
+def save_data(directory, data_map):
+    path = os.path.join(directory, DATA_FILE)
+    with open(path, 'w') as f:
+        json.dump(data_map, f, indent=2)
+
 
 def compute_orb_features(image_path):
-    """Compute ORB keypoints and descriptors for an image."""
     try:
         image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-        if image is None:
-            return None, None
-        # Ensure image dimensions are valid
-        if image.shape[0] == 0 or image.shape[1] == 0:
+        if image is None or image.size == 0:
             return None, None
         orb = cv2.ORB_create()
-        keypoints, descriptors = orb.detectAndCompute(image, None)
-        return keypoints, descriptors
+        kp, desc = orb.detectAndCompute(image, None)
+        return kp, desc
     except cv2.error as e:
-        print(f"Error processing {image_path}: {e}")
+        print(f"Error reading {image_path}: {e}")
         return None, None
 
-def match_features_and_find_homography(kp1, desc1, kp2, desc2, min_match_count=10):
-    """Match ORB features and find homography to count inliers."""
-    if desc1 is None or desc2 is None or len(kp1) < min_match_count or len(kp2) < min_match_count:
-        return 0
-    try:
-        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-        matches = bf.match(desc1, desc2)
-        if len(matches) < min_match_count:
-            return 0
-        src_pts = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
-        dst_pts = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
-        M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-        if M is not None and mask is not None:
-            inliers = np.sum(mask)
-            return inliers
-        return 0
-    except cv2.error:
-        return 0
 
-def find_similar_images(directory, query_image, threshold=10):
-    """Find images in a directory similar to the query image based on feature matching."""
-    similar_images = []
-    image_files = [f for f in os.listdir(directory) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-    
-    query_kp, query_desc = compute_orb_features(query_image)
-    if query_kp is None or query_desc is None:
-        print(f"Error: Could not process query image {query_image}")
-        return []
-    
-    most_similar = None
-    max_inliers = 0
-    
-    with tqdm(total=len(image_files), desc="Processing images") as pbar:
-        for filename in image_files:
-            image_path = os.path.join(directory, filename)
-            kp, desc = compute_orb_features(image_path)
-            if kp is None or desc is None:
+def match_and_inliers(kp1, desc1, kp2, desc2, min_matches=10):
+    if shutdown_flag or desc1 is None or desc2 is None or len(kp1) < min_matches or len(kp2) < min_matches:
+        return 0
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    matches = bf.match(desc1, desc2)
+    if len(matches) < min_matches:
+        return 0
+    src = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1,1,2)
+    dst = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1,1,2)
+    M, mask = cv2.findHomography(src, dst, cv2.RANSAC, 5.0)
+    return int(np.sum(mask)) if mask is not None else 0
+
+
+def find_similar_images(directory, query_image, threshold):
+    files = sorted(f for f in os.listdir(directory) if f.lower().endswith(('.png','.jpg','.jpeg')))
+    data_map = load_data(directory)
+    kp_q, desc_q = compute_orb_features(query_image)
+    if kp_q is None:
+        print(f"Error: Cannot process query image {query_image}")
+        return {}
+
+    total = len(files)
+    with tqdm(total=total, desc="Processing images") as pbar:
+        for fname in files:
+            pbar.set_postfix({"processed": len(data_map)})
+            if fname in data_map:
                 pbar.update(1)
                 continue
-            inliers = match_features_and_find_homography(query_kp, query_desc, kp, desc)
-            if inliers > threshold:
-                similar_images.append((filename, inliers))
-            if inliers > max_inliers:
-                max_inliers = inliers
-                most_similar = filename
-            pbar.set_postfix({'most_similar': most_similar or 'None', 'inliers': max_inliers})
+            if shutdown_flag:
+                break
+            path = os.path.join(directory, fname)
+            kp, desc = compute_orb_features(path)
+            inliers = match_and_inliers(kp_q, desc_q, kp, desc, threshold)
+            data_map[fname] = inliers
+            # save after each to persist
+            with lock:
+                save_data(directory, data_map)
             pbar.update(1)
-    
-    return similar_images
+    return data_map
+
+
+def print_summary(data_map, threshold):
+    total = len(data_map)
+    above = {f:v for f,v in data_map.items() if v > threshold}
+    print("\nSummary:")
+    print(f"  Total images     : {total}")
+    print(f"  Above threshold  : {len(above)}")
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Find similar images in a directory.")
-    parser.add_argument("directory", help="Directory containing images to search through")
-    parser.add_argument("query", help="Path to the query image")
-    parser.add_argument("--threshold", type=int, default=10, 
-                        help="Minimum number of inliers for similarity (default: 10)")
+    parser = argparse.ArgumentParser(description="Find images similar to a query image.")
+    parser.add_argument("directory", help="Directory to search")
+    parser.add_argument("query", help="Query image path")
+    parser.add_argument("--threshold", type=int, default=10,
+                        help="Min inlier count for similarity")
     args = parser.parse_args()
-    
-    similar_images = find_similar_images(args.directory, args.query, args.threshold)
-    if similar_images:
-        similar_images.sort(key=lambda x: x[1], reverse=True)
-        print("\nSimilar images found:")
-        for filename, inliers in similar_images:
-            print(f"{filename}: {inliers} inliers")
-    else:
-        print("No similar images found or error with query image.")
 
-if __name__ == "__main__":
+    data_map = find_similar_images(args.directory, args.query, args.threshold)
+    print_summary(data_map, args.threshold)
+    # list results sorted
+    results = sorted([(f,v) for f,v in data_map.items() if v > args.threshold], key=lambda x: x[1], reverse=True)
+    if results:
+        print("\nSimilar images:")
+        for fname, inl in results:
+            print(f"{fname}: {inl} inliers")
+    else:
+        print("No similar images found.")
+
+if __name__ == '__main__':
     main()

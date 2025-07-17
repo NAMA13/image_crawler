@@ -1,135 +1,150 @@
-# Image Finder and Downloader
+```markdown
+# ImCrawler
 
-This project provides two Python tools for working with images:
-1. **`find_similar.py`**: A tool to search a directory for images similar to a given query image, using ORB feature matching and homography to handle cases where the query image may be a crop of a larger image.
-2. **`download_images.py`**: A tool to scrape and download images from a list of websites, saving them with metadata for further analysis.
+**Version:** 1.3.0  
+A pair of command‑line utilities for:
 
-## Table of Contents
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Usage](#usage)
-  - [find_similar.py](#find_similarpy)
-  - [download_images.py](#download_imagespy)
-- [How It Works](#how-it-works)
-  - [find_similar.py](#find_similarpy-1)
-  - [download_images.py](#download_imagespy-1)
-- [Contributing](#contributing)
-- [License](#license)
+1. **Bulk downloading** images from a list of websites, with resume support.  
+2. **Finding visually similar** images in a local directory via ORB feature matching, with resume & inlier persistence.
 
-## Requirements
+---
 
-The project requires the following Python packages:
+## 📦 Repository Contents
 
-opencv-python==4.12.0numpy==1.26.4tqdm==4.66.5requests==2.32.3beautifulsoup4==4.12.3
+```
 
-These are listed in the `requirements.txt` file for easy installation.
+.
+├── download\_images.py       # ImCrawler Downloader (v1.1.0)
+├── find\_similar.py          # ImCrawler Similarity Checker (v1.3.0)
+├── README.md                # This file
+├── requirements.txt         # Python dependencies
+└── examples/
+├── url\_list.txt         # Example list of URLs
+└── sample\_images/       # Sample directory for similarity checker
 
-## Installation
+````
 
-1. **Clone the repository**:
+---
+
+## ⚙️ Installation
+
+1. **Clone the repo**  
    ```bash
-   git clone https://github.com/your-username/image-finder-downloader.git
-   cd image-finder-downloader
+   git clone https://github.com/yourusername/imcrawler.git
+   cd imcrawler
+````
 
+2. **Set up a virtual environment** (optional, but recommended)
 
-Set up a virtual environment (recommended):
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
 
+3. **Install dependencies**
 
-Install dependencies:
-pip install -r requirements.txt
+   ```bash
+   pip install -r requirements.txt
+   ```
 
+   > **requirements.txt** should include:
+   >
+   > ```
+   > requests
+   > beautifulsoup4
+   > tqdm
+   > opencv-python-headless
+   > numpy
+   > ```
 
-Verify installation:Ensure you have Python 3.8+ installed. Run python3 --version to check.
+---
 
+## 🚀 Usage
 
-Usage
-find_similar.py
-This script searches a directory for images similar to a query image, using ORB feature matching and homography to detect similarities, including cases where the query is a cropped portion of another image.
-Command:
-python3 find_similar.py <directory> <query_image> [--threshold <int>]
+### 1. Downloader (`download_images.py`)
 
+Bulk‑crawl websites and download all `<img>` assets into a domain‑named folder.
 
-<directory>: Path to the folder containing images to search (e.g., ./images).
-<query_image>: Path to the query image (e.g., ./b.jpg).
---threshold: Minimum number of inliers for a match (default: 10).
+```bash
+python3 download_images.py url_list.txt
+```
 
-Example:
-python3 find_similar.py images ./b.jpg --threshold 10
+* **`url_list.txt`**
+  A plain text file with one URL per line.
+* **Resume support:**
 
-Output:
+  * Existing `metadata.csv` is loaded and URLs already downloaded are skipped.
+  * On Ctrl+C, the script cleans up gracefully; re‑running will pick up where you left off.
+* **Output:**
 
-A progress bar shows processing status, including the most similar image found and images per second.
-Example:Processing images:  35%|█████ | 1953/5529 [04:08<07:35,  7.85it/s, most_similar=image_003543.jpg, inliers=12]
+  * A folder named after the first URL’s domain (e.g. `example.com/`).
+  * Inside: `image_XXXXX.ext` files and `metadata.csv` with columns:
+    `filename, image_url, page_url`.
 
+#### Example
 
-Final output lists similar images:Similar images found:
-image_003543.jpg: 12 inliers
-image_001234.jpg: 11 inliers
+```bash
+# Crawl three sites, auto‑folder “example.com”
+echo "https://example.com" > url_list.txt
+echo "https://example.com/gallery" >> url_list.txt
 
+python3 download_images.py url_list.txt
+```
 
+---
 
-download_images.py
-This script downloads images from a list of websites provided in a text file and saves metadata (filename, image URL, page URL) to a CSV file.
-Command:
-python3 download_images.py <url_list_file> <output_dir>
+### 2. Similarity Checker (`find_similar.py`)
 
+Compute ORB descriptors and RANSAC inliers to find images similar to a given query.
 
-<url_list_file>: Path to a text file containing website URLs (one per line).
-<output_dir>: Directory to save downloaded images and metadata CSV.
+```bash
+python3 find_similar.py <image_dir> <query_image> [--threshold N]
+```
 
-Example:
-python3 download_images.py urls.txt images
+* **`<image_dir>`**
+  Folder containing `.png`, `.jpg`, `.jpeg` images to scan.
+* **`<query_image>`**
+  Path to the image you want to compare against.
+* **`--threshold N`** (default: `10`)
+  Minimum number of RANSAC inliers to consider “similar.”
 
-Output:
+#### Resume & Persistence
 
-Progress bars for parsing websites and downloading images.
-Example:Parsing websites: 100%|██████████| 10/10 [00:05<00:00,  2.00site/s]
-Total unique images to download: 123
-Downloading images: 100%|██████████| 123/123 [00:10<00:00, 12.30image/s]
-Download complete! Failed downloads: 2
+* All processed filenames and their inlier counts are stored in `inliers.json` inside `<image_dir>`.
+* On startup, existing inliers are loaded, and those images are **skipped**—so you only process new ones.
+* Ctrl+C safely stops and you can rerun to continue.
 
+#### Example
 
-Creates images/metadata.csv with columns: filename, image_url, page_url.
+```bash
+# Compare “query.jpg” against 500 downloaded images in “example.com/”
+python3 find_similar.py example.com/ query.jpg --threshold 20
+```
 
-How It Works
-find_similar.py
+---
 
-Purpose: Finds images in a directory that are similar to a query image, including cases where the query is a crop of a larger image.
-Method: Uses ORB (Oriented FAST and Rotated BRIEF) feature detection and homography estimation to match images.
-ORB detects keypoints and descriptors in grayscale images.
-Features are matched using a Brute-Force matcher with Hamming distance.
-Homography (via RANSAC) identifies inliers to measure similarity, robust to cropping, scaling, or rotation.
+## 📝 Summary & Logging
 
+Both tools print:
 
-Error Handling: Skips invalid or corrupted images with clear error messages, ensuring the script doesn’t crash.
-Progress: A tqdm progress bar displays the number of images processed, processing speed, and the most similar image found so far.
+* **ASCII banner** with name & version.
+* **TQDM progress bar** showing live progress.
+* **Graceful SIGINT handling** (Ctrl+C) that stops and allows resumption.
+* **End‑of‑run summary**, including counts of successes/failures or similar matches.
 
-download_images.py
+---
 
-Purpose: Scrapes and downloads images from a list of websites, deduplicates them, and saves metadata.
-Method:
-Parses each website using BeautifulSoup to extract <img> tag URLs.
-Deduplicates image URLs to avoid redundant downloads.
-Downloads images concurrently using requests and saves them as image_XXXXXX.jpg.
-Saves metadata (filename, image URL, page URL) to metadata.csv.
+## 📄 License
 
+Distributed under the MIT License. See `LICENSE` for details.
 
-Concurrency: Uses ThreadPoolExecutor for efficient parsing and downloading.
-Progress: Shows progress bars for parsing and downloading phases, with counts of failed downloads.
+---
 
-Contributing
-Contributions are welcome! To contribute:
+## 🛠️ Contributing
 
-Fork the repository.
-Create a feature branch (git checkout -b feature-name).
-Commit changes (git commit -m 'Add feature').
-Push to the branch (git push origin feature-name).
-Open a pull request.
+1. Fork the repo
+2. Create a feature branch
+3. Commit & push
+4. Open a pull request
 
-Fikir babasi: Rafig Zarbaliyev
-
-Please include tests and update the README if necessary.
-License
-This project is licensed under the MIT License. See the LICENSE file for details.```
+Feel free to report issues or propose enhancements!
