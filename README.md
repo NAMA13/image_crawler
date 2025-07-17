@@ -13,13 +13,19 @@ A pair of command‑line utilities for:
 
 ```
 
-.
-├── download\_images.py       # ImCrawler Downloader (v1.1.0)
-├── find\_similar.py          # ImCrawler Similarity Checker (v1.3.0)
+
+├── download\_images.py       # ImCrawler Downloader (v1.0.2)
+
+├── find\_similar.py          # ImCrawler Similarity Checker (v1.0.2)
+
 ├── README.md                # This file
+
 ├── requirements.txt         # Python dependencies
+
 └── examples/
+
 ├── url\_list.txt         # Example list of URLs
+
 └── sample\_images/       # Sample directory for similarity checker
 
 ````
