@@ -1,7 +1,7 @@
 ```markdown
 # ImCrawler
 
-**Version:** 1.3.0  
+**Version:** 1.0.2  
 A pair of command‑line utilities for:
 
 1. **Bulk downloading** images from a list of websites, with resume support.  
